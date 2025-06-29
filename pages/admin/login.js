@@ -52,8 +52,6 @@ export default function AdminLogin() {
               placeholder="admin@example.com"
             />
           </Form.Item>
-          <button className='bg-red-900 text-900'> how can you  </button>
-
           <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Please enter your password' }]}>
             <Input.Password
               value={password}
