@@ -1,4 +1,3 @@
-// pages/employee/login.js
 import { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient'; // ✅ relative import
 import { useRouter } from 'next/router';

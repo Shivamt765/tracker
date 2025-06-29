@@ -1,33 +1,46 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import {
+  Form,
+  Input,
+  Select,
+  Upload,
+  Button,
+  Typography,
+  Alert,
+  message as antdMessage,
+} from 'antd';
+import { UploadOutlined } from '@ant-design/icons';
+
+const { Title } = Typography;
 
 export default function AddEmployee() {
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [role, setRole] = useState('employee');
-  const [department, setDepartment] = useState('');
-  const [position, setPosition] = useState('');
-  const [photo, setPhoto] = useState(null);
+  const [form] = Form.useForm();
+  const [photoFile, setPhotoFile] = useState(null);
   const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleAddEmployee = async (e) => {
-    e.preventDefault();
+  const handleAddEmployee = async (values) => {
+    setSubmitting(true);
     setMessage('');
 
+    const { email, name, department, position, role } = values;
     let photoPath = null;
 
-    if (photo) {
-      const fileExt = photo.name.split('.').pop();
+    if (photoFile) {
+      const fileExt = photoFile.name.split('.').pop();
       const fileName = `${email}_${Date.now()}.${fileExt}`;
       const filePath = `photos/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('visit-photos')
-        .upload(filePath, photo);
+        .upload(filePath, photoFile);
 
       if (uploadError) {
         console.error(uploadError);
-        return setMessage('❌ Failed to upload photo.');
+        setMessage('❌ Failed to upload photo.');
+        setSubmitting(false);
+        return;
       }
 
       photoPath = filePath;
@@ -46,39 +59,100 @@ export default function AddEmployee() {
 
     if (insertError) {
       console.error(insertError);
-      return setMessage('❌ Failed to add employee.');
+      setMessage('❌ Failed to add employee.');
+      setSubmitting(false);
+      return;
     }
 
     setMessage('✅ Employee added successfully!');
-    setEmail('');
-    setName('');
-    setDepartment('');
-    setPosition('');
-    setRole('employee');
-    setPhoto(null);
+    antdMessage.success('Employee added!');
+    form.resetFields();
+    setPhotoFile(null);
+    setSubmitting(false);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form onSubmit={handleAddEmployee} className="bg-white p-6 rounded shadow-md w-full max-w-md space-y-4">
-        <h2 className="text-xl font-bold">Add New Employee</h2>
+    <div style={{ minHeight: '100vh' }} className="flex items-center justify-center bg-gray-100">
+      <div className="bg-white p-8 rounded shadow-md w-full max-w-lg">
+        <Title level={3}>Add New Employee</Title>
 
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full border p-2 rounded" />
-        <input type="text" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required className="w-full border p-2 rounded" />
-        <input type="text" placeholder="Department" value={department} onChange={(e) => setDepartment(e.target.value)} required className="w-full border p-2 rounded" />
-        <input type="text" placeholder="Position" value={position} onChange={(e) => setPosition(e.target.value)} required className="w-full border p-2 rounded" />
-        
-        <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full border p-2 rounded">
-          <option value="employee">Employee</option>
-          <option value="admin">Admin</option>
-        </select>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleAddEmployee}
+        >
+          <Form.Item
+            label="Email"
+            name="email"
+            rules={[{ required: true, type: 'email', message: 'Please enter a valid email' }]}
+          >
+            <Input />
+          </Form.Item>
 
-        <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files[0])} className="w-full border p-2 rounded" />
+          <Form.Item
+            label="Name"
+            name="name"
+            rules={[{ required: true, message: 'Please enter name' }]}
+          >
+            <Input />
+          </Form.Item>
 
-        <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Add Employee</button>
+          <Form.Item
+            label="Department"
+            name="department"
+            rules={[{ required: true, message: 'Please enter department' }]}
+          >
+            <Input />
+          </Form.Item>
 
-        {message && <p className="text-sm">{message}</p>}
-      </form>
+          <Form.Item
+            label="Position"
+            name="position"
+            rules={[{ required: true, message: 'Please enter position' }]}
+          >
+            <Input />
+          </Form.Item>
+
+          <Form.Item label="Role" name="role" initialValue="employee">
+            <Select>
+              <Select.Option value="employee">Employee</Select.Option>
+              <Select.Option value="admin">Admin</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item label="Photo (optional)">
+            <Upload
+              beforeUpload={(file) => {
+                setPhotoFile(file);
+                return false; // prevent auto-upload
+              }}
+              showUploadList={{ showRemoveIcon: true }}
+              onRemove={() => setPhotoFile(null)}
+            >
+              <Button icon={<UploadOutlined />}>Select Photo</Button>
+            </Upload>
+          </Form.Item>
+
+          <Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={submitting}
+              block
+            >
+              Add Employee
+            </Button>
+          </Form.Item>
+        </Form>
+
+        {message && (
+          <Alert
+            type={message.startsWith('✅') ? 'success' : 'error'}
+            message={message}
+            showIcon
+          />
+        )}
+      </div>
     </div>
   );
 }

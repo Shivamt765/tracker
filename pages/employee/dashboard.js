@@ -13,11 +13,18 @@ export default function EmployeeDashboard() {
 
   useEffect(() => {
     const fetchUserAndLocation = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      setUser(userData.user);
-      setEmployeeName(userData.user?.user_metadata?.name || '');
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data?.user) {
+        setMessage('❌ Failed to fetch user');
+        return;
+      }
+
+      const currentUser = data.user;
+      setUser(currentUser);
+      setEmployeeName(currentUser.user_metadata?.name || '');
+
       fetchLocation();
-      checkAttendance(userData.user);
+      checkAttendance(currentUser);
     };
 
     fetchUserAndLocation();
@@ -40,27 +47,31 @@ export default function EmployeeDashboard() {
   };
 
   const checkAttendance = async (user) => {
+    if (!user?.id) return;
+
     const today = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('attendance')
       .select('*')
       .eq('employee_id', user.id)
       .eq('date', today);
 
-    if (data && data.length > 0) {
+    if (data?.length > 0) {
       setAttendanceMarked(true);
     }
   };
 
   const ensureEmployeeExists = async (user) => {
-    const { data: existing, error: fetchError } = await supabase
+    if (!user?.id) return;
+
+    const { data: existing } = await supabase
       .from('employees')
       .select('*')
       .eq('id', user.id)
       .single();
 
-    if (!existing && !fetchError) {
-      const { error: insertError } = await supabase.from('employees').insert({
+    if (!existing) {
+      await supabase.from('employees').insert({
         id: user.id,
         email: user.email,
         name: employeeName || 'Unnamed',
@@ -68,10 +79,6 @@ export default function EmployeeDashboard() {
         department: 'Unknown',
         position: 'Field Executive',
       });
-
-      if (insertError) {
-        console.error('⚠️ Failed to insert employee:', insertError.message);
-      }
     }
   };
 
@@ -79,7 +86,7 @@ export default function EmployeeDashboard() {
     setLoading(true);
     setMessage('');
 
-    if (!user || attendanceMarked) {
+    if (!user?.id || attendanceMarked) {
       setMessage('⚠️ Already checked in or not logged in');
       setLoading(false);
       return;
@@ -90,15 +97,14 @@ export default function EmployeeDashboard() {
     const now = new Date();
     const status = now.getHours() <= 9 ? 'present' : 'late';
 
-    const { error: insertError } = await supabase.from('attendance').insert({
+    const { error } = await supabase.from('attendance').insert({
       employee_id: user.id,
       date: now.toISOString().split('T')[0],
       check_in_time: now.toISOString(),
       status,
     });
 
-    if (insertError) {
-      console.error('⛔ Attendance error:', insertError.message);
+    if (error) {
       setMessage('⚠️ Already checked in or error occurred.');
     } else {
       setMessage('✅ Attendance marked.');
@@ -113,7 +119,7 @@ export default function EmployeeDashboard() {
     setLoading(true);
     setMessage('');
 
-    if (!user) {
+    if (!user?.id) {
       setMessage('❌ Not logged in');
       setLoading(false);
       return;
@@ -152,7 +158,6 @@ export default function EmployeeDashboard() {
     });
 
     if (error) {
-      console.error('Visit insert error:', error.message);
       setMessage('❌ Could not save visit.');
     } else {
       setMessage('✅ Visit submitted.');
@@ -162,7 +167,8 @@ export default function EmployeeDashboard() {
   };
 
   const handleNameUpdate = async () => {
-    if (!user || !employeeName) return;
+    if (!user?.id || !employeeName) return;
+
     const { error } = await supabase
       .from('employees')
       .update({ name: employeeName })
@@ -181,21 +187,34 @@ export default function EmployeeDashboard() {
   };
 
   return (
-    <div style={{
-      maxWidth: '800px',
-      margin: '2rem auto',
-      padding: '2rem',
-      borderRadius: '20px',
-      background: 'rgba(255, 255, 255, 0.1)',
-      backdropFilter: 'blur(12px)',
-      border: '1px solid rgba(255, 255, 255, 0.2)',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-      color: '#fff',
-      fontFamily: 'sans-serif'
-    }}>
+    <div
+      className="text-white"
+      style={{
+        maxWidth: '800px',
+        margin: '2rem auto',
+        padding: '2rem',
+        borderRadius: '20px',
+        background: 'rgba(0, 0, 0, 0.6)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+        fontFamily: 'sans-serif',
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>Welcome, {employeeName || 'Employee'}</h1>
-        <button onClick={handleLogout} style={{ backgroundColor: '#e3342f', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px' }}>Logout</button>
+        <button
+          onClick={handleLogout}
+          style={{
+            backgroundColor: '#e3342f',
+            color: '#fff',
+            border: 'none',
+            padding: '0.5rem 1rem',
+            borderRadius: '8px',
+          }}
+        >
+          Logout
+        </button>
       </div>
 
       <div style={{ marginBottom: '1rem' }}>
@@ -204,11 +223,25 @@ export default function EmployeeDashboard() {
           type="text"
           value={employeeName}
           onChange={(e) => setEmployeeName(e.target.value)}
-          style={{ display: 'block', width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #ccc', marginTop: '0.25rem', marginBottom: '0.5rem' }}
+          style={{
+            display: 'block',
+            width: '100%',
+            padding: '0.5rem',
+            borderRadius: '8px',
+            border: '1px solid #ccc',
+            marginTop: '0.25rem',
+            marginBottom: '0.5rem',
+          }}
         />
         <button
           onClick={handleNameUpdate}
-          style={{ backgroundColor: '#f59e0b', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px' }}
+          style={{
+            backgroundColor: '#f59e0b',
+            color: '#fff',
+            border: 'none',
+            padding: '0.5rem 1rem',
+            borderRadius: '8px',
+          }}
         >
           Update Name
         </button>
@@ -217,7 +250,15 @@ export default function EmployeeDashboard() {
       <button
         onClick={handleCheckIn}
         disabled={loading || attendanceMarked}
-        style={{ backgroundColor: attendanceMarked ? '#9ca3af' : '#2563eb', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '10px', border: 'none', width: '100%', marginBottom: '1rem' }}
+        style={{
+          backgroundColor: attendanceMarked ? '#9ca3af' : '#2563eb',
+          color: 'white',
+          padding: '0.75rem 1.5rem',
+          borderRadius: '10px',
+          border: 'none',
+          width: '100%',
+          marginBottom: '1rem',
+        }}
       >
         {attendanceMarked ? 'Attendance Already Marked' : 'Mark Attendance'}
       </button>
@@ -241,7 +282,13 @@ export default function EmployeeDashboard() {
         <button
           type="submit"
           disabled={loading}
-          style={{ backgroundColor: '#16a34a', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '10px', border: 'none' }}
+          style={{
+            backgroundColor: '#16a34a',
+            color: 'white',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '10px',
+            border: 'none',
+          }}
         >
           Upload Visit
         </button>

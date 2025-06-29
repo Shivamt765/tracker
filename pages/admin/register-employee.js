@@ -1,20 +1,30 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import {
+  Form,
+  Input,
+  Select,
+  Button,
+  Typography,
+  Alert,
+  message as antdMessage,
+} from 'antd';
+
+const { Title } = Typography;
+const { Option } = Select;
 
 export default function RegisterEmployee() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [role, setRole] = useState('employee');
-  const [department, setDepartment] = useState('');
-  const [position, setPosition] = useState('');
+  const [form] = Form.useForm();
   const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleRegister = async (e) => {
-    e.preventDefault();
+  const handleRegister = async (values) => {
+    setSubmitting(true);
     setMessage('');
 
-    // Step 1: Sign up the user in Supabase Auth
+    const { email, password, name, role, department, position } = values;
+
+    // Step 1: Sign up with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -22,6 +32,7 @@ export default function RegisterEmployee() {
 
     if (authError) {
       setMessage(`❌ Auth error: ${authError.message}`);
+      setSubmitting(false);
       return;
     }
 
@@ -29,10 +40,11 @@ export default function RegisterEmployee() {
 
     if (!userId) {
       setMessage('❌ Failed to get user ID from Supabase Auth.');
+      setSubmitting(false);
       return;
     }
 
-    // Step 2: Insert into employees table
+    // Step 2: Insert employee data
     const { error: insertError } = await supabase.from('employees').insert([
       {
         id: userId,
@@ -48,80 +60,97 @@ export default function RegisterEmployee() {
       setMessage(`❌ DB error: ${insertError.message}`);
     } else {
       setMessage(`✅ ${role === 'admin' ? 'Admin' : 'Employee'} registered successfully!`);
-      setEmail('');
-      setPassword('');
-      setName('');
-      setDepartment('');
-      setPosition('');
+      antdMessage.success('User registered successfully!');
+      form.resetFields();
     }
+
+    setSubmitting(false);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <form onSubmit={handleRegister} className="bg-white p-6 rounded shadow-md w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">Register Employee/Admin</h2>
+    <div style={{ minHeight: '100vh' }} className="flex items-center justify-center bg-gray-50 p-4">
+      <div className="bg-white p-8 rounded shadow-md w-full max-w-md">
+        <Title level={3}>Register Employee/Admin</Title>
 
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="w-full p-2 border mb-3 rounded"
-        />
-
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="w-full p-2 border mb-3 rounded"
-        />
-
-        <input
-          type="text"
-          placeholder="Full Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          className="w-full p-2 border mb-3 rounded"
-        />
-
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          className="w-full p-2 border mb-3 rounded"
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleRegister}
+          requiredMark={false}
         >
-          <option value="employee">Employee</option>
-          <option value="admin">Admin</option>
-        </select>
+          <Form.Item
+            name="email"
+            label="Email"
+            rules={[{ required: true, type: 'email' }]}
+          >
+            <Input placeholder="Enter email" />
+          </Form.Item>
 
-        <input
-          type="text"
-          placeholder="Department"
-          value={department}
-          onChange={(e) => setDepartment(e.target.value)}
-          className="w-full p-2 border mb-3 rounded"
-        />
+          <Form.Item
+            name="password"
+            label="Password"
+            rules={[{ required: true, min: 6 }]}
+          >
+            <Input.Password placeholder="Enter password" />
+          </Form.Item>
 
-        <input
-          type="text"
-          placeholder="Position"
-          value={position}
-          onChange={(e) => setPosition(e.target.value)}
-          className="w-full p-2 border mb-4 rounded"
-        />
+          <Form.Item
+            name="name"
+            label="Full Name"
+            rules={[{ required: true }]}
+          >
+            <Input placeholder="Enter full name" />
+          </Form.Item>
 
-        {message && <p className="text-sm text-blue-700 mb-3">{message}</p>}
+          <Form.Item
+            name="role"
+            label="Role"
+            initialValue="employee"
+            rules={[{ required: true }]}
+          >
+            <Select>
+              <Option value="employee">Employee</Option>
+              <Option value="admin">Admin</Option>
+            </Select>
+          </Form.Item>
 
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
-        >
-          Register
-        </button>
-      </form>
+          <Form.Item
+            name="department"
+            label="Department"
+            rules={[{ required: true }]}
+          >
+            <Input placeholder="Enter department" />
+          </Form.Item>
+
+          <Form.Item
+            name="position"
+            label="Position"
+            rules={[{ required: true }]}
+          >
+            <Input placeholder="Enter position" />
+          </Form.Item>
+
+          {message && (
+            <Alert
+              type={message.startsWith('✅') ? 'success' : 'error'}
+              message={message}
+              className="mb-4"
+              showIcon
+            />
+          )}
+
+          <Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={submitting}
+              block
+            >
+              Register
+            </Button>
+          </Form.Item>
+        </Form>
+      </div>
     </div>
   );
 }
