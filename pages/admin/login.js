@@ -1,7 +1,9 @@
-// pages/admin/login.js
 import { useState } from 'react';
-import { supabase } from '../../lib/supabaseClient';
 import { useRouter } from 'next/router';
+import { supabase } from '../../lib/supabaseClient';
+import { Form, Input, Button, Typography, Alert, Card } from 'antd';
+
+const { Title } = Typography;
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -9,8 +11,7 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleLogin = async () => {
     setError('');
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -21,7 +22,6 @@ export default function AdminLogin() {
     if (error) {
       setError(error.message);
     } else {
-      // 🔐 Check if user is admin
       const { data: employee, error: empErr } = await supabase
         .from('employees')
         .select('*')
@@ -39,39 +39,40 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form
-        onSubmit={handleLogin}
-        className="bg-white p-6 rounded shadow-md w-full max-w-md"
+    <div className="h-screen w-screen flex items-center justify-center bg-gray-100">
+      <Card
+        style={{ width: 400 }}
+        title={<Title level={3}>Admin Login</Title>}
       >
-        <h2 className="text-2xl font-semibold mb-4">Admin Login</h2>
+        <Form layout="vertical" onFinish={handleLogin}>
+          <Form.Item label="Email" name="email" rules={[{ required: true, message: 'Please enter your email' }]}>
+            <Input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@example.com"
+            />
+          </Form.Item>
+          <button className='bg-red-900 text-900'> how can you  </button>
 
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="w-full p-2 border mb-3 rounded"
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="w-full p-2 border mb-3 rounded"
-        />
+          <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Please enter your password' }]}>
+            <Input.Password
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Your password"
+            />
+          </Form.Item>
 
-        {error && <p className="text-red-600 mb-3">{error}</p>}
+          {error && (
+            <Alert message={error} type="error" showIcon style={{ marginBottom: '16px' }} />
+          )}
 
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
-        >
-          Login
-        </button>
-      </form>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" block>
+              Login
+            </Button>
+          </Form.Item>
+        </Form>
+      </Card>
     </div>
   );
 }
